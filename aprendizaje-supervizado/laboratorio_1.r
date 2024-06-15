@@ -5,6 +5,7 @@ library(faraway)
 # Utilizar datos chicago
 data(chicago)
 ?faraway::chicago
+
 # 1. ANALISIS DESCRIPTIVO de las variables de la base de datos. Incluir indicadores y gráficos.
 # Columnas
 names(chicago)
@@ -29,9 +30,16 @@ boxplot(chicago$age)
 boxplot(chicago$volact)
 boxplot(chicago$income)
 pairs(chicago)
+nrow(chicago)
 
 # 2. SELECCION DE VARIABLES
-modelo_inicial <- lm(involact ~ ., data = chicago)
-summary(modelo_inicial)
-model_2 <- step(lm(involact ~ ., data = chicago), direction = "both", trace = 1000)
-model3 <- step(lm(involact ~ ., data = chicago), trace = 0, k = log(length(chicago$involact)))
+# Usaremos el Criterio de Información de Akaike (AIC)
+modelo_completo <- lm(involact ~ ., data = chicago)
+summary(modelo_completo)
+modelo_aic <- step(lm(involact ~ ., data = chicago), direction = "both", trace = 1000)
+summary(model_aic)
+# Usaremos el Criterio de Información Bayesiano (BIC)
+modelo_bic <- step(lm(involact ~ ., data = chicago),direction = "both" ,trace = 1000, k = log(length(chicago$involact)))
+summary(modelo_bic)
+
+# 3. Significancia del Modelo
