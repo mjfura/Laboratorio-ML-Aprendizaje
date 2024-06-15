@@ -33,13 +33,15 @@ pairs(chicago)
 nrow(chicago)
 
 # 2. SELECCION DE VARIABLES
-# Usaremos el Criterio de Información de Akaike (AIC)
+# Modelo usando todas las variables
 modelo_completo <- lm(involact ~ ., data = chicago)
 summary(modelo_completo)
+# Criterio de Información de Akaike (AIC)
 modelo_aic <- step(lm(involact ~ ., data = chicago), direction = "both", trace = 1000)
 summary(model_aic)
-# Usaremos el Criterio de Información Bayesiano (BIC)
+# Criterio de Información Bayesiano (BIC)
 modelo_bic <- step(lm(involact ~ ., data = chicago),direction = "both" ,trace = 1000, k = log(length(chicago$involact)))
 summary(modelo_bic)
+# En este caso vemos que usando los criterios de AIC y BIC se seleccionan las mismas variables
 
 # 3. Significancia del Modelo
