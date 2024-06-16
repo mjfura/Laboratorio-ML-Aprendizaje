@@ -36,9 +36,6 @@ boxplot(chicago$volact)
 boxplot(chicago$income)
 pairs(chicago)
 
-<<<<<<< HEAD
-# 2. SELECCION DE VARIABLES MAS SIGNIFICATIVAS
-=======
 # 2. SELECCION DE VARIABLES
 # Definir datos de entrenamiento y de prueba
 set.seed(123)
@@ -48,7 +45,6 @@ train_data <- chicago[train_index,]
 test_data <- chicago[-train_index,]
 print(nrow(test_data))
 print(nrow(train_data))
->>>>>>> 5b3c9bf894fdff5e0a5e9752fcfeec154e0afa49
 # Modelo usando todas las variables
 modelo_completo <- lm(involact ~ ., data = train_data)
 summary(modelo_completo)
@@ -66,7 +62,6 @@ summary(modelo_completo)
 
 
 # Criterio de Información de Akaike (AIC)
-<<<<<<< HEAD
 modelo_aic <- step(lm(involact ~ ., data = chicago), direction = "both", trace = 1000)
 summary(modelo_aic)
 #Resultado *****
@@ -86,10 +81,6 @@ summary(modelo_aic)
 
 
 
-=======
-modelo_aic <- step(lm(involact ~ ., data = train_data), direction = "both", trace = 1000)
-summary(model_aic)
->>>>>>> 5b3c9bf894fdff5e0a5e9752fcfeec154e0afa49
 # Criterio de Información Bayesiano (BIC)
 modelo_bic <- step(lm(involact ~ ., data = train_data),direction = "both" ,trace = 1000, k = log(length(train_data$involact)))
 summary(modelo_bic)
@@ -101,30 +92,18 @@ summary(modelo_bic)
 anova(modelo_completo)
 anova(modelo_aic)
 anova(modelo_bic)
-<<<<<<< HEAD
 anova(modelo_completo, modelo_aic)
 # Ambos modelos son significativos
 # Existen 2 covariables que no son significativas: volact y income
 # El modelo lineal generado ocupando solo las 4 variables significativas tiene un ajuste muy similar al modelo completo. Es decir remover las 2 variables menos significativas no genera una mejora significativa en el ajuste del modelo.
 # El modelo no mejora significativamente al quitar las variables no significativas.
-=======
-anova(modelo_completo, modelo_aic,modelo_bic)
-# El modelo obtenido es significativo, es decir que las variables seleccionadas son significativas para explicar la variable involact.
-# Existen 2 covariables que no son significativas: volact y income según los criterios de AIC y BIC.
-# - En base solo a los criterios AIC y BIC, el modelo obtenido es el mismo, por lo que no habría problema si es que removemos las dos variables menos significativas.
->>>>>>> 5b3c9bf894fdff5e0a5e9752fcfeec154e0afa49
 
 # 4. MÉTODOS DE REGRESION CONTRAIDAS
 
 # - REGRESION RIDGE
-<<<<<<< HEAD
 
 install.packages("glmnet")
 library(glmnet)
-=======
-X <- model.matrix(involact ~ . - 1, data = train_data)
-y <- train_data$involact
->>>>>>> 5b3c9bf894fdff5e0a5e9752fcfeec154e0afa49
 # Seleccionar el valor de lambda
 ridge_model <- cv.glmnet(X, y, alpha = 0)
 coef_ridge <- coef(ridge_model, s = "lambda.min")
