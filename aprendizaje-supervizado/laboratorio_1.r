@@ -4,7 +4,6 @@ install.packages("glmnet")
 # Cargar faraway
 library(faraway)
 library(glmnet)
-
 # Utilizar datos chicago
 data(chicago)
 ?faraway::chicago
@@ -36,6 +35,7 @@ pairs(chicago)
 
 # 2. SELECCION DE VARIABLES
 # Definir datos de entrenamiento y de prueba
+# En este caso estamos dejando 5 observaciones para realizar las predicciones en el punto 5, el resto se está usando como data de entrenamiento.
 set.seed(123)
 num_observaciones <- nrow(chicago)
 train_index <- sample(1:num_observaciones, 0.9*num_observaciones)
@@ -88,6 +88,7 @@ print(coef_elastic_net)
 selected_vars_ridge <- rownames(coef_ridge)[coef_ridge[, 1] != 0]
 selected_vars_lasso <- rownames(coef_lasso)[coef_lasso[, 1] != 0]
 selected_vars_elastic_net <- rownames(coef_elastic_net)[coef_elastic_net[, 1] != 0]
+
 formula_ridge <- as.formula(paste("involact ~", paste(selected_vars_ridge[-1], collapse = " + ")))
 formula_lasso <- as.formula(paste("involact ~", paste(selected_vars_lasso[-1], collapse = " + ")))
 formula_elastic_net <- as.formula(paste("involact ~", paste(selected_vars_elastic_net[-1], collapse = " + ")))
@@ -96,6 +97,7 @@ modelo_ridge <- lm(formula_ridge, data = train_data)
 modelo_lasso <- lm(formula_lasso, data = train_data)
 modelo_elastic_net <- lm(formula_elastic_net, data = train_data)
 anova(modelo_completo,modelo_aic,modelo_ridge, modelo_lasso, modelo_elastic_net)
+
 # Conclusiones:
 # - Al realizar la compración con los modelos anteriores y estos creados por los métodos de regresión contraidas, vemos que la significancia entre los modelos de ridge, lasso y elastic net es prácticamente el mismo ajuste, sin embargo al mismo tiempo este varía un poco del modelo obtenido por el criterio AIC y es muy similar por no decir igual que el modelo completo, y esto es de esperarse, ya que ninguno de estos métodos de regresión contraidas ha removido variables del modelo completo.
 
@@ -104,6 +106,21 @@ anova(modelo_completo,modelo_aic,modelo_ridge, modelo_lasso, modelo_elastic_net)
 # Predicción individual
 # Predicción de la media
 # Modelos Ridge, Lasso y Elastic Net
+valores_prueba<-test_data[,colnames(test_data)!="involact"]
 # Predicción individual
-
+pred_individual_modelo_ridge <- predict(modelo_ridge, valores_prueba, interval = "prediction", level = 0.95)
+pred_individual_modelo_lasso <- predict(modelo_lasso, valores_prueba, interval = "prediction", level = 0.95)
+pred_individual_modelo_elastic_net <- predict(modelo_elastic_net, valores_prueba, interval = "prediction", level = 0.95)
+print(pred_individual_modelo_ridge)
+print(pred_individual_modelo_lasso)
+print(pred_individual_modelo_elastic_net)
 # Predicción de la media
+pred_media_modelo_ridge <- predict(modelo_ridge, valores_prueba, interval = "confidence", level = 0.95)
+pred_media_modelo_lasso <- predict(modelo_lasso, valores_prueba, interval = "confidence", level = 0.95)
+pred_media_modelo_elastic_net <- predict(modelo_elastic_net, valores_prueba, interval = "confidence", level = 0.95)
+print(pred_media_modelo_ridge)
+print(pred_media_modelo_lasso)
+print(pred_media_modelo_elastic_net)
+# En este caso sabemos que el mejor ajuste es el del modelo completo con un R2 ajustado de 0.727
+# EL modelo AIC le sigue con un R2 ajustado de 0.7231
+# Los modelos de regresión contraidas tienen un R2 ajustado de 0.727 los 3, por lo que tiene un ajuste muy similar por no decir igual al del modelo completo y eso también ocurre por el uso de las 6 variables en lugar de 4 como lo hace el modelo AIC.
