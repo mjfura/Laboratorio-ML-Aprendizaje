@@ -94,7 +94,7 @@ anova(modelo_completo, modelo_aic,modelo_bic)
 # Ambos modelos son significativos
 # Existen 2 covariables que no son significativas: volact y income
 # El modelo lineal generado ocupando solo las 4 variables significativas tiene un ajuste muy similar al modelo completo. Es decir remover las 2 variables menos significativas no genera una mejora significativa en el ajuste del modelo.
-# El modelo no mejora significativamente al quitar las variables no significativas.
+# El modelo no mejora significativamente al quitar las variables no significativas, sin embargo en este caso consideramos que al tratarse de pocos datos y parámetros es totalmente indiferente la decisión de poder removerl las variables par aun modelo final óptimo.
 
 # 4. MÉTODOS DE REGRESION CONTRAIDAS
 
