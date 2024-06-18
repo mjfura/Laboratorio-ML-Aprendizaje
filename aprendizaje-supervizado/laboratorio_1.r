@@ -1,5 +1,5 @@
 # SOLUCION LABORATORIO 1
-# Integrantes:
+# INTEGRANTES:
 # - Marcos Esteban Reiman Durán
 # - Marco Josué Fura Mendoza
 # Instalar faraway
