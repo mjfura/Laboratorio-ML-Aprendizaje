@@ -1,4 +1,7 @@
-
+# SOLUCION LABORATORIO 1
+# Integrantes:
+# - Marcos Esteban Reiman Durán
+# - Marco Josué Fura Mendoza
 # Instalar faraway
 install.packages("faraway")
 install.packages("glmnet")
@@ -8,8 +11,6 @@ library(glmnet)
 # Utilizar datos chicago
 data(chicago)
 ?faraway::chicago
-
-chicago
 # 1. ANALISIS DESCRIPTIVO de las variables de la base de datos. Incluir indicadores y gráficos.
 # Columnas
 names(chicago)
@@ -50,31 +51,31 @@ modelo_completo <- lm(involact ~ ., data = train_data)
 summary(modelo_completo)
 
 #Comentarios de resultados****
-#Residual standard error: 0.3387 on 40 degrees of freedom
-#Multiple R-squared:  0.7517,    Adjusted R-squared:  0.7144
-#F-statistic: 20.18 on 6 and 40 DF,  p-value: 1.072e-10
+#Residual standard error: 0.3391 on 35 degrees of freedom
+#Multiple R-squared:  0.7669,    Adjusted R-squared:  0.727
+# F-statistic: 19.2 on 6 and 35 DF,  p-value: 9.352e-10
 #DETALLE
-#Residual standard error: 0.3387 --> Esto mide el error estándar , mide la calida de los predictores del modelo
-#Multiple R-squared:  0.7517 --> el 75.17%  de la variabilidad se explica por las variables independientes
-#Adjusted R-squared:  0.7144 --> es un 71.44% al ser más bajo que el anterior indica que hay algun variable predictora que no agregar mucha información 
+# Residual standard error: 0.3391 --> Esto mide el error estándar , mide la calida de los predictores del modelo
+# Multiple R-squared:  0.7669 --> el 76.69%  de la variabilidad se explica por las variables independientes
+# Adjusted R-squared:  0.727  --> es un 72.7% al ser más bajo que el anterior indica que hay algun variable predictora que no agregar mucha información
 
 
 
 
 # Criterio de Información de Akaike (AIC)
-modelo_aic <- step(lm(involact ~ ., data = chicago), direction = "both", trace = 1000)
+modelo_aic <- step(lm(involact ~ ., data = train_data), direction = "both", trace = 1000)
 summary(modelo_aic)
 #Resultado *****
 #Hace 3 iteraciones 
-# Start:  AIC=-95.34  <-- con todas las variables  --> involact ~ race + fire + theft + age + volact + income
-# Step:  AIC=-97.18   <-- quita la variable volact --> involact ~ race + fire + theft + age + income
-# Step:  AIC=-98.5    <-- quita la variable income --> involact ~ race + fire + theft + age
+# Start:  AIC=-84.51  <-- con todas las variables  --> involact ~ race + fire + theft + age + volact + income
+# Step:  AIC=-84.82   <-- quita la variable income --> involact ~ race + fire + theft + age + volact
+# Step:  AIC=-85.27    <-- quita la variable volact --> involact ~ race + fire + theft + age
 # las variables descartas (volact,income) en las iteraciones
 # El resultado del modelo 
-# Residual standard error: 0.3335 on 42 degrees of freedom
-# Multiple R-squared:  0.7472,    Adjusted R-squared:  0.7231
-# F-statistic: 31.03 on 4 and 42 DF,  p-value: 4.799e-12
-# Residual standard error: 0.3335 <-- el bajo error residual 
+# Residual standard error: 0.3427 on 37 degrees of freedom
+# Multiple R-squared:  0.7482,    Adjusted R-squared:  0.721
+# F-statistic: 27.49 on 4 and 37 DF,  p-value: 1.23e-10
+# Residual standard error: 0.3391 <-- el bajo error residual es del modelo completo
 
 
 
@@ -89,10 +90,7 @@ summary(modelo_bic)
 # - Con el uso de los criterios AIC y BIC ambos me consideran solo 4 variables como significativas para la elaboración del modelo lineal: race, fire, theft y age.
 
 # 3. Significancia del Modelo
-anova(modelo_completo)
-anova(modelo_aic)
-anova(modelo_bic)
-anova(modelo_completo, modelo_aic)
+anova(modelo_completo, modelo_aic,modelo_bic)
 # Ambos modelos son significativos
 # Existen 2 covariables que no son significativas: volact y income
 # El modelo lineal generado ocupando solo las 4 variables significativas tiene un ajuste muy similar al modelo completo. Es decir remover las 2 variables menos significativas no genera una mejora significativa en el ajuste del modelo.
@@ -102,9 +100,8 @@ anova(modelo_completo, modelo_aic)
 
 # - REGRESION RIDGE
 
-install.packages("glmnet")
-library(glmnet)
-# Seleccionar el valor de lambda
+X <- model.matrix(involact ~ . - 1, data = train_data)
+y <- train_data$involact
 ridge_model <- cv.glmnet(X, y, alpha = 0)
 coef_ridge <- coef(ridge_model, s = "lambda.min")
 print(coef_ridge)
@@ -136,15 +133,26 @@ anova(modelo_completo,modelo_aic,modelo_ridge, modelo_lasso, modelo_elastic_net)
 # - Al realizar la compración con los modelos anteriores y estos creados por los métodos de regresión contraidas, vemos que la significancia entre los modelos de ridge, lasso y elastic net es prácticamente el mismo ajuste, sin embargo al mismo tiempo este varía un poco del modelo obtenido por el criterio AIC y es muy similar por no decir igual que el modelo completo, y esto es de esperarse, ya que ninguno de estos métodos de regresión contraidas ha removido variables del modelo completo.
 
 # 5. PREDICCION INDIVIDUAL Y DE LA MEDIA
+valores_prueba<-test_data[,colnames(test_data)!="involact"]
 # Modelos lineales AIC y el completo
 # Predicción individual
+pred_individual_modelo_completo <- predict(modelo_completo, valores_prueba, interval = "prediction", level = 0.95)
+pred_individual_modelo_aic <- predict(modelo_aic, valores_prueba, interval = "prediction", level = 0.95)
+# Mostramos los valores individuales predichos con sus intervalos de confianza en un 95%
+print(pred_individual_modelo_completo)
+print(pred_individual_modelo_aic)
 # Predicción de la media
+pred_media_modelo_completo <- predict(modelo_completo, valores_prueba, interval = "confidence", level = 0.95)
+pred_media_modelo_aic <- predict(modelo_aic, valores_prueba, interval = "confidence", level = 0.95)
+# Mostramos los valores medios predichos con sus intervalos de confianza en un 95%
+print(pred_media_modelo_completo)
+print(pred_media_modelo_aic)
 # Modelos Ridge, Lasso y Elastic Net
-valores_prueba<-test_data[,colnames(test_data)!="involact"]
 # Predicción individual
 pred_individual_modelo_ridge <- predict(modelo_ridge, valores_prueba, interval = "prediction", level = 0.95)
 pred_individual_modelo_lasso <- predict(modelo_lasso, valores_prueba, interval = "prediction", level = 0.95)
 pred_individual_modelo_elastic_net <- predict(modelo_elastic_net, valores_prueba, interval = "prediction", level = 0.95)
+# Mostramos los valores individuales predichos con sus intervalos de confianza en un 95%
 print(pred_individual_modelo_ridge)
 print(pred_individual_modelo_lasso)
 print(pred_individual_modelo_elastic_net)
@@ -152,6 +160,7 @@ print(pred_individual_modelo_elastic_net)
 pred_media_modelo_ridge <- predict(modelo_ridge, valores_prueba, interval = "confidence", level = 0.95)
 pred_media_modelo_lasso <- predict(modelo_lasso, valores_prueba, interval = "confidence", level = 0.95)
 pred_media_modelo_elastic_net <- predict(modelo_elastic_net, valores_prueba, interval = "confidence", level = 0.95)
+# Mostramos los valores medios predichos con sus intervalos de confianza en un 95%
 print(pred_media_modelo_ridge)
 print(pred_media_modelo_lasso)
 print(pred_media_modelo_elastic_net)
