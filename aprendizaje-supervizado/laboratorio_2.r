@@ -11,6 +11,236 @@ library(caret)
 library(randomForest)
 library(pROC)
 
+
+# Función para verificar e instalar paquetes si es necesario
+verificar_paquete <- function(paquete) {
+  if (!require(paquete, character.only = TRUE)) {
+    install.packages(paquete)
+    library(paquete, character.only = TRUE)
+  }
+}
+
+# Verificar e instalar los paquetes necesarios
+paquetes <- c("splitTools", "rpart.plot", "caret", "randomForest", "ggplot2", "faraway", "pROC")
+
+for (paquete in paquetes) {
+  verificar_paquete(paquete)
+}
+
+# Cargar librerías necesarias
+library(faraway)
+library(splitTools)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(randomForest)
+library(pROC)
+library(ggplot2)
+
+# Utilizar el conjunto de datos "chicago" disponible en la librería "faraway".
+# Considerar Y = involact como variable respuesta, todas las demás serán variables explicativas.
+
+data(chicago, package = "faraway")
+head(chicago)
+
+# Filtrar solo las columnas numéricas
+chicago_numerico <- chicago[, sapply(chicago, is.numeric)]
+
+# Guardar el boxplot en un archivo PNG con dimensiones específicas
+png("boxplot.png", width = 1200, height = 800)
+
+# Ajustar los márgenes para evitar el error "figure margins too large"
+par(mar = c(5, 8, 4, 2) + 0.1)
+
+# Crear boxplots para todas las columnas numéricas
+boxplot(chicago_numerico,
+        main = "Boxplots de todas las columnas numéricas",
+        las = 2,
+        col = rainbow(ncol(chicago_numerico))
+)
+
+# Cerrar el dispositivo gráfico
+dev.off()
+
+# Funciones para calcular medidas de desempeño
+# Esta función calcula el Error Cuadrático Medio (MSE)
+calcular_mse <- function(real, prediccion) {
+  return(mean((real - prediccion)^2))
+}
+
+# Esta función calcula el Error Absoluto Medio (MAE)
+calcular_mae <- function(real, prediccion) {
+  return(mean(abs(real - prediccion)))
+}
+
+# Esta función calcula el Coeficiente de Determinación (R²)
+calcular_r2 <- function(real, prediccion) {
+  ss_res <- sum((real - prediccion)^2)
+  ss_tot <- sum((real - mean(real))^2)
+  return(1 - (ss_res / ss_tot))
+}
+
+# Función para realizar una separación aleatoria para validación cruzada simple
+split_cv_simple <- function(dataset) {
+  ind <- splitTools::partition(dataset$involact, p = c(0.5, 0.2, 0.3), type = "stratified")
+  datos_entrenamiento <- dataset[ind$`1`, ]
+  datos_validacion <- dataset[ind$`2`, ]
+  datos_prueba <- dataset[ind$`3`, ]
+  
+  entren_x <- datos_entrenamiento[, -which(names(datos_entrenamiento) == "involact")]
+  entren_y <- datos_entrenamiento$involact
+  
+  valid_x <- datos_validacion[, -which(names(datos_validacion) == "involact")]
+  valid_y <- datos_validacion$involact
+  
+  prueba_x <- datos_prueba[, -which(names(datos_prueba) == "involact")]
+  prueba_y <- datos_prueba$involact
+  
+  return(list(entren_x, entren_y, valid_x, valid_y, prueba_x, prueba_y))
+}
+
+# Ejecutar la función de separación de datos
+result <- split_cv_simple(chicago)
+entren_x <- result[[1]]
+entren_y <- result[[2]]
+valid_x <- result[[3]]
+valid_y <- result[[4]]
+prueba_x <- result[[5]]
+prueba_y <- result[[6]]
+
+# Entrenar modelos K-NN, Árboles de Regresión y Random Forest y evaluar el mejor modelo con la muestra de validación
+
+# Entrenar modelo KNN
+modelo_knn <- train(
+  x = entren_x, y = entren_y,
+  method = "knn"
+)
+prediccion_knn <- predict(modelo_knn, newdata = valid_x)
+mse_knn <- calcular_mse(valid_y, prediccion_knn)
+mae_knn <- calcular_mae(valid_y, prediccion_knn)
+r2_knn <- calcular_r2(valid_y, prediccion_knn)
+print(c(mse_knn, mae_knn, r2_knn))
+
+# Entrenar modelo Árbol de Regresión
+arbol_regresion <- rpart(involact ~ ., data = data.frame(entren_x, involact = entren_y), method = "anova")
+rpart.plot(arbol_regresion)
+predicciones_arbol <- predict(arbol_regresion, newdata = valid_x)
+mse_arbol <- calcular_mse(valid_y, predicciones_arbol)
+mae_arbol <- calcular_mae(valid_y, predicciones_arbol)
+r2_arbol <- calcular_r2(valid_y, predicciones_arbol)
+print(c(mse_arbol, mae_arbol, r2_arbol))
+
+# Entrenar modelo Random Forest
+modelo_rf <- randomForest(involact ~ ., data = data.frame(entren_x, involact = entren_y), ntree = 500)
+predicciones_rf <- predict(modelo_rf, newdata = valid_x)
+mse_rf <- calcular_mse(valid_y, predicciones_rf)
+mae_rf <- calcular_mae(valid_y, predicciones_rf)
+r2_rf <- calcular_r2(valid_y, predicciones_rf)
+print(c(mse_rf, mae_rf, r2_rf))
+
+# Seleccionar el mejor modelo según MSE
+mejor_modelo <- ifelse(min(mse_knn, mse_arbol, mse_rf) == mse_knn, "KNN",
+                       ifelse(min(mse_knn, mse_arbol, mse_rf) == mse_arbol, "Árbol de Regresión", "Random Forest"))
+print(mejor_modelo)
+
+# Evaluar el mejor modelo con la muestra de prueba
+if (mejor_modelo == "KNN") {
+  predicciones_prueba <- predict(modelo_knn, newdata = prueba_x)
+} else if (mejor_modelo == "Árbol de Regresión") {
+  predicciones_prueba <- predict(arbol_regresion, newdata = prueba_x)
+} else {
+  predicciones_prueba <- predict(modelo_rf, newdata = prueba_x)
+}
+mse_prueba <- calcular_mse(prueba_y, predicciones_prueba)
+mae_prueba <- calcular_mae(prueba_y, predicciones_prueba)
+r2_prueba <- calcular_r2(prueba_y, predicciones_prueba)
+print(c(mse_prueba, mae_prueba, r2_prueba))
+
+# Función para realizar una separación aleatoria para validación cruzada k-fold
+split_cv_fold <- function(dataset, k_fold) {
+  ind <- splitTools::partition(dataset$involact, p = c(0.7, 0.3), type = "stratified")
+  datos_entrenamiento <- dataset[ind$`1`, ]
+  datos_prueba <- dataset[ind$`2`, ]
+  
+  entren_x <- datos_entrenamiento[, -which(names(datos_entrenamiento) == "involact")]
+  entren_y <- datos_entrenamiento$involact
+  
+  prueba_x <- datos_prueba[, -which(names(datos_prueba) == "involact")]
+  prueba_y <- datos_prueba$involact
+  
+  control <- trainControl(method = "cv", number = k_fold, savePredictions = TRUE)
+  
+  return(list(entren_x, entren_y, prueba_x, prueba_y, control))
+}
+
+# Ejecutar la función de separación de datos k-fold
+result <- split_cv_fold(chicago, 10)
+entren_x <- result[[1]]
+entren_y <- result[[2]]
+prueba_x <- result[[3]]
+prueba_y <- result[[4]]
+control <- result[[5]]
+
+# Entrenar modelos K-NN, Árboles de Regresión y Random Forest con validación cruzada k-fold
+
+# Entrenar modelo KNN con validación cruzada k-fold
+modelo_knn <- train(
+  x = entren_x, y = entren_y,
+  method = "knn",
+  trControl = control
+)
+predicciones_knn <- modelo_knn$pred
+mse_knn <- mean((predicciones_knn$obs - predicciones_knn$pred)^2)
+mae_knn <- mean(abs(predicciones_knn$obs - predicciones_knn$pred))
+r2_knn <- calcular_r2(predicciones_knn$obs, predicciones_knn$pred)
+print(c(mse_knn, mae_knn, r2_knn))
+
+# Entrenar modelo Árbol de Regresión con validación cruzada k-fold
+arbol_regresion <- train(
+  x = entren_x, y = entren_y,
+  method = "rpart",
+  trControl = control
+)
+predicciones_arbol <- arbol_regresion$pred
+mse_arbol <- mean((predicciones_arbol$obs - predicciones_arbol$pred)^2)
+mae_arbol <- mean(abs(predicciones_arbol$obs - predicciones_arbol$pred))
+r2_arbol <- calcular_r2(predicciones_arbol$obs, predicciones_arbol$pred)
+print(c(mse_arbol, mae_arbol, r2_arbol))
+
+# Entrenar modelo Random Forest con validación cruzada k-fold
+tuneGrid <- expand.grid(.mtry = 3)
+modelo_rf <- train(
+  x = entren_x, y = entren_y,
+  method = "rf",
+  trControl = control,
+  tuneGrid = tuneGrid,
+  ntree = 500
+)
+predicciones_rf <- modelo_rf$pred
+mse_rf <- mean((predicciones_rf$obs - predicciones_rf$pred)^2)
+mae_rf <- mean(abs(predicciones_rf$obs - predicciones_rf$pred))
+r2_rf <- calcular_r2(predicciones_rf$obs, predicciones_rf$pred)
+print(c(mse_rf, mae_rf, r2_rf))
+
+# Seleccionar el mejor modelo según MSE en validación cruzada k-fold
+mejor_modelo_kfold <- ifelse(min(mse_knn, mse_arbol, mse_rf) == mse_knn, "KNN",
+                             ifelse(min(mse_knn, mse_arbol, mse_rf) == mse_arbol, "Árbol de Regresión", "Random Forest"))
+print(mejor_modelo_kfold)
+
+# Ajustar los parámetros con toda la muestra de entrenamiento y usar la muestra de prueba
+if (mejor_modelo_kfold == "KNN") {
+  predicciones_prueba_kfold <- predict(modelo_knn, newdata = prueba_x)
+} else if (mejor_modelo_kfold == "Árbol de Regresión") {
+  predicciones_prueba_kfold <- predict(arbol_regresion, newdata = prueba_x)
+} else {
+  predicciones_prueba_kfold <- predict(modelo_rf, newdata = prueba_x)
+}
+mse_prueba_kfold <- calcular_mse(prueba_y, predicciones_prueba_kfold)
+mae_prueba_kfold <- calcular_mae(prueba_y, predicciones_prueba_kfold)
+r2_prueba_kfold <- calcular_r2(prueba_y, predicciones_prueba_kfold)
+print(c(mse_prueba_kfold, mae_prueba_kfold, r2_prueba_kfold))
+
+
 # PREGUNTAS PARTE 02
 # 1. De acuerdo al contexto del conjunto de datos,
 # seleccione alguna de las medidas de desempeñno que considere apropiada.
