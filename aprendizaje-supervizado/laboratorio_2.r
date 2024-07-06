@@ -38,6 +38,7 @@ names(chicago) <- c("Raza", "Incendios", "Robos", "Edad", "ActividadesVoluntaria
 # Mostrar los primeros datos
 head(chicago)
 print(chicago)
+nrow(chicago)
 
 # Resumen de datos
 summary(chicago)
@@ -106,7 +107,7 @@ modelo_rf <- randomForest(ActividadesInvoluntarias ~ ., data = data_train, ntree
 predictions <- predict(modelo_rf, valid_x)
 mse_rf <- mean((predictions - valid_y)^2)
 print(mse_rf)
-# 0.2899481
+# 0.2878254
 
 #  resultados
 cat("K-NN MSE:", mse_knn, "\n")
