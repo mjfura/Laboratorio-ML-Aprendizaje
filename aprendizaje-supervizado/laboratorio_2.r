@@ -1,3 +1,8 @@
+# LABORATORIO 02
+# -----
+# INTEGRANTES:
+# - Marcos Esteban Reiman Durán
+# - Marco Josué Fura Mendoza
 
 # Instalar librerias
 install.packages("splitTools")
@@ -5,6 +10,7 @@ install.packages("rpart.plot")
 install.packages("caret")
 install.packages("randomForest")
 # !Instalar librerias
+
 # Cargar librerias
 library(faraway)
 library(caret)
@@ -14,11 +20,15 @@ library(rpart)
 library(randomForest)
 library(ggplot2)
 library(pROC)
+# !Cargar librerias
+set.seed(0)
 
 # Cargar datos
 data(chicago, package = "faraway")
+chicago
+# Cambiamos los nombres de las columnas a español, nuestra variable objetivo Involact es ahora ActividadesInvoluntarias
 names(chicago) <- c("Raza", "Incendios", "Robos", "Edad", "ActividadesVoluntarias", "ActividadesInvoluntarias", "Ingresos")
-
+?chicago
 # Preguntas parte 1
 #1.- Seleccione alguna de las medidas de desempe˜ no que pueda ser utilizada en este conjunto
 #de datos. Indique el criterio utilizado.
@@ -49,48 +59,64 @@ ggplot(chicago, aes(x = Edad, y = Ingresos)) +
   geom_point() +
   labs(title = "Diagrama de Dispersión entre Edad e Ingresos", x = "Edad", y = "Ingresos")
 
-preprocesamiento <- preProcess(chicago, method = c("center", "scale"))
-chicago_normalizado <- predict(preprocesamiento, chicago)
+# Escalar datos
+boxplot(chicago)
+scaled_data <- as.data.frame(scale(chicago))
+boxplot(scaled_data)
+# !Escalar datos
 
 # (a) Entrenar con los modelos K-NN, Arboles de Regresion y Random Forest utilizando la muestra
 # de entrenamiento. A partir de la medida de desempeno escogida anteriormente, ¿cual
 # de los metodos tiene el mejor resultado, segun la muestra de validacion?
 
-# Separar los datos 
-IndiceDatosEntrenamiento <- createDataPartition(chicago_normalizado$Ingresos, p = 0.5, list = FALSE)
-datosEntrenamiento <- chicago_normalizado[IndiceDatosEntrenamiento, ]
-datosTemporales <- chicago_normalizado[-IndiceDatosEntrenamiento, ]
+ind <- splitTools::partition(scaled_data$ActividadesInvoluntarias, p = c(0.5, 0.2, 0.3))
+data_train <- scaled_data[ind$`1`, ]
+data_valid <- scaled_data[ind$`2`, ]
+data_test <- scaled_data[ind$`3`, ]
 
-
-# Se calibra a 0.38 para que sea 20% y 30% 
-IndiceDatosValidacion <- createDataPartition(datosTemporales$Ingresos, p = 0.38, list = FALSE)
-datosValidacion <- datosTemporales[IndiceDatosValidacion, ]
-datosPrueba <- datosTemporales[-IndiceDatosValidacion, ]
+train_x <- data_train[, setdiff(seq_len(ncol(data_train)), 6)]
+train_y <- data_train[, 6]
+valid_x <- data_valid[, setdiff(seq_len(ncol(data_valid)), 6)]
+valid_y <- data_valid[, 6]
+test_x <- data_test[, setdiff(seq_len(ncol(data_test)), 6)]
+test_y <- data_test[, 6]
 
 
 # Entrenar los modelos 
-modeloKNN <- knn(train = datosEntrenamiento[ , -7], test = datosValidacion[ , -7], cl = datosEntrenamiento$Ingresos, k = 5)
+# Modelo KNN
+modelo_knn <- train(
+    x = train_x, y = train_y,
+    method = "knn"
+)
+modelo_knn
+prediccion_knn <- predict(modelo_knn, newdata = valid_x)
+mse_knn <- mean((prediccion_knn - valid_y)^2)
+print(mse_knn)
+# 0.2513297
 
-modeloArbol <- rpart(Ingresos ~ ., data = datosEntrenamiento, method = "anova")
-prediccionesArbol <- predict(modeloArbol, newdata = datosValidacion)
+# Modelo Arbol de Regresion
+modelo_arbol <- rpart(ActividadesInvoluntarias ~ ., data = data_train, method = "anova")
+predicciones_arbol <- predict(modelo_arbol, newdata = data_valid)
+mse_arbol <- mean((predicciones_arbol - valid_y)^2)
+print(mse_arbol)
+# 0.5918206
 
-modeloRF <- randomForest(Ingresos ~ ., data = datosEntrenamiento)
-prediccionesRF <- predict(modeloRF, newdata = datosValidacion)
-
-# Calcular MSE para cada modelo
-knnMSE <- mean((as.numeric(modeloKNN) - datosValidacion$Ingresos)^2)
-arbolMSE <- mean((prediccionesArbol - datosValidacion$Ingresos)^2)
-rfMSE <- mean((prediccionesRF - datosValidacion$Ingresos)^2)
+# Modelo Random Forest
+modelo_rf <- randomForest(ActividadesInvoluntarias ~ ., data = data_train, ntree = 500, mtry = 3, importance = TRUE)
+predictions <- predict(modelo_rf, valid_x)
+mse_rf <- mean((predictions - valid_y)^2)
+print(mse_rf)
+# 0.2899481
 
 #  resultados
-cat("K-NN MSE:", knnMSE, "\n")
-cat("Árbol de Regresión MSE:", arbolMSE, "\n")
-cat("Random Forest MSE:", rfMSE, "\n")
+cat("K-NN MSE:", mse_knn, "\n")
+cat("Árbol de Regresión MSE:", mse_arbol, "\n")
+cat("Random Forest MSE:", mse_rf, "\n")
 
 # Graficar los resultados
 datos_MSE <- data.frame(
   Modelo = c("K-NN", "Árbol de Regresión", "Random Forest"),
-  MSE = c(knnMSE, arbolMSE, rfMSE)
+  MSE = c(mse_knn, mse_arbol, mse_rf)
 )
 
 ggplot(datos_MSE, aes(x = Modelo, y = MSE)) +
@@ -100,20 +126,26 @@ ggplot(datos_MSE, aes(x = Modelo, y = MSE)) +
   theme_minimal()
 
 
-#El modelo random Forest es el que obtiene el mejor resultado con MSE más pequeño
+#El modelo KNN es el que obtiene el mejor resultado con MSE más pequeño
 # Predicciones en conjunto de prueba
-prediccionesFinales <- predict(modeloRF, newdata = datosPrueba)
+modelo_knn <- train(
+    x = rbind(train_x,valid_x), y = c(train_y,valid_y),
+    method = "knn"
+)
+modelo_knn
+prediccion_knn <- predict(modelo_knn, newdata = test_x)
 
 # Calcular MSE en conjunto de prueba
-finalMSE <- mean((prediccionesFinales - datosPrueba$Ingresos)^2)
+mse_simple <- mean((prediccion_knn - test_y)^2)
+print(mse_simple)
 
 # Imprimir resultado final
-cat("MSE en el conjunto de prueba:", finalMSE, "\n")
+cat("MSE en el conjunto de prueba:", mse_simple, "\n")
 
 
 #(b) Para el modelo seleccionado en el paso anterior, utilice la muestra test para medir la calidad
 #del ajuste. Comente los resultados
-# MSE en el conjunto de prueba: 0.2287013  
+# MSE en el conjunto de prueba: 0.24574
 
 
 #PREGUNTA 1: item 3
@@ -125,35 +157,60 @@ cat("MSE en el conjunto de prueba:", finalMSE, "\n")
 
 
 # Hacemos la separación de los datos en entrenamiento (70%) y prueba (30%)
+ind <- splitTools::partition(scaled_data$ActividadesInvoluntarias, p = c(0.7, 0.3))
+data_train <- scaled_data[ind$`1`, ]
+data_test <- scaled_data[ind$`2`, ]
 
-indice_muestra_entrenamiento <- createDataPartition(chicago_normalizado$Ingresos, p = 0.7, list = FALSE)
-muestra_entrenamiento <- chicago_normalizado[indice_muestra_entrenamiento,]
-muestra_prueba <- chicago_normalizado[-indice_muestra_entrenamiento,]
+train_x <- data_train[, setdiff(seq_len(ncol(data_train)), 6)]
+train_y <- data_train[, 6]
 
-# Se establece k= 5 como una primera prueba, luego se va obtener cual seria el K más optimo
-control_validacion_cruzada_5 <- trainControl(method = "cv", number = 5)
+test_x <- data_test[, setdiff(seq_len(ncol(data_test)), 6)]
+test_y <- data_test[, 6]
+control <- trainControl(method = "cv", number = 5, savePredictions = TRUE)
 
 # Entrenamiento de modelos
-modelo_knn <- train(Ingresos ~ ., data = muestra_entrenamiento, method = "knn", trControl = control_validacion_cruzada_5)
-print(modelo_knn)
-modelo_arbol_regresion <- train(Ingresos ~ ., data = muestra_entrenamiento, method = "rpart", trControl = control_validacion_cruzada_5)
-print(modelo_arbol_regresion)
-modelo_random_forest <- train(Ingresos ~ ., data = muestra_entrenamiento, method = "rf", trControl = control_validacion_cruzada_5)
-print(modelo_random_forest)
+# KNN
+modelo_knn <- train(
+    x = train_x, y = train_y,
+    method = "knn",
+    trControl = control
+)
+predicciones_knn <- modelo_knn$pred
+predicciones_knn
+mse_knn <- mean((predicciones_knn$pred - predicciones_knn$obs)^2)
+print(mse_knn)
+# 0.5030658
 
-# Se hace la prueba de validación cruzada
-resultados_validacion_cruzada_5 <- resamples(list(KNN = modelo_knn, Arbol_Regression = modelo_arbol_regresion, Random_Forest = modelo_random_forest))
-summary(resultados_validacion_cruzada_5)
+# Arbol de regresion
+arbol_regresion <- train(
+    x = train_x, y = train_y,
+    method = "rpart",
+    trControl = control
+)
+predicciones_arbol <- arbol_regresion$pred
+mse_arbol <- mean((predicciones_arbol$pred - predicciones_arbol$obs)^2)
+print(mse_arbol)
+# 0.8022707
+
+# Random Forest
+
+modelo_rf <- train(
+    x = train_x, y = train_y,
+    method = "rf",
+    trControl = control
+)
+modelo_rf
+predicciones_rf <- modelo_rf$pred
+mse_rf <- mean((predicciones_rf$pred - predicciones_rf$obs)^2)
+print(mse_rf)
+# 0.4184307
 
   
-# Crear gráfico comparando los MSE de los modelos
-mse_knn <- mean((predict(modelo_knn, newdata = muestra_prueba) - muestra_prueba$Ingresos)^2)
-mse_arbol_regresion <- mean((predict(modelo_arbol_regresion, newdata = muestra_prueba) - muestra_prueba$Ingresos)^2)
-mse_random_forest <- mean((predict(modelo_random_forest, newdata = muestra_prueba) - muestra_prueba$Ingresos)^2)
+# # Crear gráfico comparando los MSE de los modelos
 
 df_mse <- data.frame(
   Modelo = c("K-NN", "Árbol de Regresión", "Random Forest"),
-  MSE = c(mse_knn, mse_arbol_regresion, mse_random_forest)
+  MSE = c(mse_knn, mse_arbol, mse_rf)
 )
 
 ggplot(df_mse, aes(x = Modelo, y = MSE, fill = Modelo)) +
@@ -164,34 +221,50 @@ ggplot(df_mse, aes(x = Modelo, y = MSE, fill = Modelo)) +
   xlab("Modelo")
 
 
-# Probar nuevamente con k-fold seguerido de 7 
-control_validacion_cruzada_7 <- trainControl(method = "cv", number = 7)
+# Probar nuevamente con k-fold seguerido de 10 
+control_10 <- trainControl(method = "cv", number = 10, savePredictions = TRUE)
 
 # volver a probar los modelos
-modelo_knn_7 <- train(Ingresos ~ ., data = muestra_entrenamiento, method = "knn", trControl = control_validacion_cruzada_7)
-print(modelo_knn_7)
+# KNN
+modelo_knn <- train(
+    x = train_x, y = train_y,
+    method = "knn",
+    trControl = control_10
+)
+predicciones_knn <- modelo_knn$pred
+mse_knn <- mean((predicciones_knn$pred - predicciones_knn$obs)^2)
+print(mse_knn)
+# 0.4445108
 
-modelo_arbol_regresion_7 <- train(Ingresos ~ ., data = muestra_entrenamiento, method = "rpart", trControl = control_validacion_cruzada_7)
-print(modelo_arbol_regresion_7)
+# Arbol de regresion
+arbol_decision <- train(
+    x = train_x, y = train_y,
+    method = "rpart",
+    trControl = control_10
+)
+predicciones_arbol <- arbol_decision$pred
+mse_arbol <- mean((predicciones_arbol$pred - predicciones_arbol$obs)^2)
+print(mse_arbol)
+# 1.058191
 
-modelo_random_forest_7 <- train(Ingresos ~ ., data = muestra_entrenamiento, method = "rf", trControl = control_validacion_cruzada_7)
-print(modelo_random_forest_7)
-
-resultados_validacion_cruzada_7 <- resamples(list(KNN_7 = modelo_knn_7, Arbol_Regression_7 = modelo_arbol_regresion_7, Random_Forest_7 = modelo_random_forest_7))
-summary(resultados_validacion_cruzada_7)
+# Random Forest
+modelo_rf <- train(
+    x = train_x, y = train_y,
+    method = "rf",
+    trControl = control_10
+)
+modelo_rf
+predicciones_rf <- modelo_rf$pred
+mse_rf <- mean((predicciones_rf$pred - predicciones_rf$obs)^2)
+print(mse_rf)
+# 0.4445661
 
 # Seleccionar el mejor modelo basado en la validación cruzada
-mejor_modelo <- modelo_random_forest
 
-
-# Crear gráfico comparando los MSE de los modelos
-mse_knn_2 <- mean((predict(modelo_knn_7, newdata = muestra_prueba) - muestra_prueba$Ingresos)^2)
-mse_arbol_regresion_2 <- mean((predict(modelo_arbol_regresion_7, newdata = muestra_prueba) - muestra_prueba$Ingresos)^2)
-mse_random_forest_2 <- mean((predict(modelo_random_forest_7, newdata = muestra_prueba) - muestra_prueba$Ingresos)^2)
-
+# # Crear gráfico comparando los MSE de los modelos
 df_mse_2 <- data.frame(
   Modelo = c("K-NN", "Árbol de Regresión", "Random Forest"),
-  MSE = c(mse_knn_2, mse_arbol_regresion_2, mse_random_forest_2)
+  MSE = c(mse_knn, mse_arbol, mse_rf)
 )
 
 ggplot(df_mse_2, aes(x = Modelo, y = MSE, fill = Modelo)) +
@@ -201,23 +274,22 @@ ggplot(df_mse_2, aes(x = Modelo, y = MSE, fill = Modelo)) +
   ylab("MSE") +
   xlab("Modelo")
 
-#En la primera iteración el KNN iba ganando pero luego de aumentar el K de 5 a 7 , random forest mejor el desempeño
+#En la primera iteración el KNN iba ganando pero luego de aumentar el K de 5 a 10 , random forest mejor el desempeño
 
 
 # Ajustar el mejor modelo seleccionado (Random Forest) con toda la muestra de entrenamiento y medir con la muestra test
 
-modelo_final <- randomForest(Ingresos ~ ., data = muestra_entrenamiento)
-prediccion_prueba <- predict(modelo_final, newdata = muestra_prueba)
-mse <- mean((prediccion_prueba - muestra_prueba$Ingresos)^2)
+prediccion_prueba <- predict(modelo_rf, newdata = test_x)
+mse_rf_k_fold <- mean((prediccion_prueba - test_y)^2)
 
-print(paste("MSE del modelo Random Forest en la muestra de prueba:", mse))
-# MSE del modelo Random Forest en la muestra de prueba: 0.192807492206826
+print(paste("MSE del modelo Random Forest en la muestra de prueba:", mse_rf_k_fold))
+# MSE del modelo Random Forest en la muestra de prueba: 0.13319362668877
 
 
 
 df_mse_3 <- data.frame(
   Modelo = c( "Simple","k-fold"),
-  MSE = c(mse_random_forest_2, rfMSE)
+  MSE = c(mse_simple, mse_rf_k_fold)
 )
 
 ggplot(df_mse_3, aes(x = Modelo, y = MSE, fill = Modelo)) +
@@ -510,7 +582,53 @@ print(f1_score_rf)
 
 #PREGUNTAS ADICIONALES:
 # 1.
+# COMO METRICA DE RENDIMIENTO ALTERNATIVA USAREMOS EL R2 ajustado
+ind <- splitTools::partition(scaled_data$ActividadesInvoluntarias, p = c(0.5, 0.2, 0.3))
+data_train <- scaled_data[ind$`1`, ]
+data_valid <- scaled_data[ind$`2`, ]
+data_test <- scaled_data[ind$`3`, ]
+
+train_x <- data_train[, setdiff(seq_len(ncol(data_train)), 6)]
+train_y <- data_train[, 6]
+valid_x <- data_valid[, setdiff(seq_len(ncol(data_train)), 6)]
+valid_y <- data_valid[, 6]
+test_x <- data_test[, setdiff(seq_len(ncol(data_train)), 6)]
+test_y <- data_test[, 6]
+
+modelo_rf <- randomForest(ActividadesInvoluntarias ~ ., data = rbind(data_train, data_valid), ntree = 500, mtry = 3, importance = TRUE)
+predictions <- predict(modelo_rf, test_x)
+
+r2_rf <- 1 - sum((predictions - test_y)^2) / sum((test_y - mean(test_y))^2)
+print(paste("R^2:", r2_rf))
+# R^2: 0.825868921770942
+
+# Random forest k fold 10
+ind <- splitTools::partition(scaled_data$ActividadesInvoluntarias, p = c(0.7, 0.3))
+data_train <- scaled_data[ind$`1`, ]
+data_test <- scaled_data[ind$`2`, ]
+
+train_x <- data_train[, setdiff(seq_len(ncol(data_train)), 6)]
+train_y <- data_train[, 6]
+
+test_x <- data_test[, setdiff(seq_len(ncol(data_train)), 6)]
+test_y <- data_test[, 6]
+control <- trainControl(method = "cv", number = 10, savePredictions = TRUE)
+
+modelo_rf <- train(
+    x = train_x, y = train_y,
+    method = "rf",
+    trControl = control
+)
+modelo_rf
+predicciones_rf <- predict(modelo_rf, test_x)
+
+r2_rf <- 1 - sum((predicciones_rf - test_y)^2) / sum((test_y - mean(test_y))^2)
+print(paste("R^2:", r2_rf))
+# 0.856340743506255
+# Usando el R2 vemos que el modelo random forest para un k-fold 10 explica el 85.63% de la variabilidad de los datos
+
 # 2.
+# COMO METRICA DE RENDIMIENTO ALTERNATIVA USAREMOS EL AUC DE LA CURVA ROC
 result <- split_cv_simple(wbca)
 train_x <- result[[1]]
 train_y <- result[[2]]
@@ -561,7 +679,7 @@ roc_auc <- calcular_auc(test_y_factor, predicciones_rf)
 print(roc_auc)
 # 0.9577
 
-# COMO METRICA DE RENDIMIENTO ALTERNATIVA USAREMOS EL AUC DE LA CURVA ROC
+
 # PARA EL MODELO KNN EN VALIDACION CRUZADA SIMPLE OBTUVIMOS UN AUC DE 0.9887
 # PARA EL MODELO RANDOM FOREST EN VALIDACION CRUZADA K FOLD 10 OBTUVIMOS UN AUC DE 0.9647
 # POR LO QUE PODEMOS CONCLUIR QUE EL MODELO KNN ES EL QUE MEJOR SE AJUSTA A LOS DATOS SEGUN ESTA NUEVA METRICA
