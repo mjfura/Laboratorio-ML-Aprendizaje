@@ -21,8 +21,6 @@ names(chicago) <- c("Raza", "Incendios", "Robos", "Edad", "ActividadesVoluntaria
 head(chicago)
 print(chicago)
 
-chicago
-
 # Resumen de datos
 summary(chicago)
 
